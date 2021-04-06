@@ -63,13 +63,13 @@ def stego_spectro(config, audio_pth='tests/test1.wav', target_text=('aa', 'jh'))
             print("Iteration: {}, Loss: {}, cur_out: {}, d_max: {}".format(e, loss, cur_out, d_max))
             if cur_out == target[0].tolist():
                 print("Got target output")
-                inverse_delta(config, to_feed.detach().T, preproc, name='matching')
+                inverse_delta(config, to_feed.detach(), preproc, name='matching')
             if e % 100 == 0:
                 print("Writing audio")
-                inverse_delta(config, to_feed.detach().T, preproc)
+                inverse_delta(config, to_feed.detach(), preproc)
 
 
-def stego_audio(config, audio_pth='tests/test1.wav', target_text=('cl', 'dh')):
+def stego_audio(config, audio_pth='tests/timit.wav', target_text=('cl', 'dh', 'sil')):
     # config['audio'] contains hop, window and fs params
     config = config['audio']
     # load model

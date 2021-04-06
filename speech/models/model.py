@@ -134,11 +134,18 @@ class LinearND(nn.Module):
         return out.view(size)
 
 
-def zero_pad_concat(inputs):
-    max_t = max(inp.shape[0] for inp in inputs)
-    shape = (len(inputs), max_t, inputs[0].shape[1])
-    input_mat = torch.zeros(shape, dtype=torch.float)
-    for e, inp in enumerate(inputs):
-        input_mat[e, :inp.shape[0], :] = inp
-    return input_mat
-
+def zero_pad_concat(inputs, feat_or_target, fill_value=0):
+    if feat_or_target == 'feat':
+        max_t = max(inp.shape[0] for inp in inputs)
+        shape = (len(inputs), max_t, inputs[0].shape[1])
+        input_mat = torch.full(shape, fill_value=fill_value, dtype=torch.float)
+        for e, inp in enumerate(inputs):
+            input_mat[e, :inp.shape[0], :] = inp
+        return input_mat
+    else:
+        max_t = max(inp.shape[0] for inp in inputs)
+        shape = (len(inputs), max_t)
+        input_mat = torch.full(shape, fill_value=fill_value, dtype=torch.long)
+        for e, inp in enumerate(inputs):
+            input_mat[e, :inp.shape[0]] = inp
+        return input_mat

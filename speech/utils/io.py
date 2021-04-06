@@ -21,19 +21,19 @@ def get_names(path, tag):
     return model, preproc
 
 
-def save(model, preproc, path, tag=""):
+def save(model, opti, preproc, path, tag=""):
     model_n, preproc_n = get_names(path, tag)
-    torch.save(model, model_n)
+    torch.save((model, opti), model_n)
     with open(preproc_n, 'wb') as fid:
         pickle.dump(preproc, fid)
 
 
 def load(path, tag=""):
     model_n, preproc_n = get_names(path, tag)
-    model = torch.load(model_n, map_location=torch.device('cpu'))
+    model, opti = torch.load(model_n, map_location=torch.device('cpu'))
     with open(preproc_n, 'rb') as fid:
         preproc = pickle.load(fid)
-    return model, preproc
+    return model, opti, preproc
 
 
 def array_from_wave(file_name):

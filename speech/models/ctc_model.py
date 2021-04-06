@@ -41,10 +41,10 @@ class CTC(model.Model):
     def collate(self, inputs, labels):
         max_t = max(i.shape[0] for i in inputs)
         max_t = self.conv_out_size(max_t, 0)
-        x_lens = torch.IntTensor([max_t] * len(inputs))
-        x = torch.FloatTensor(model.zero_pad_concat(inputs))
-        y_lens = torch.IntTensor([len(l) for l in labels])
-        y = torch.IntTensor([l for label in labels for l in label])
+        x_lens = torch.full((len(inputs), 1), fill_value=max_t, dtype=torch.long)
+        x = model.zero_pad_concat(inputs, 'feat')
+        y_lens = torch.tensor([len(l) for l in labels], dtype=torch.long)
+        y = model.zero_pad_concat([torch.tensor(l) for l in labels], 'target', fill_value=self.blank)
         batch = [x, y, x_lens, y_lens]
         if self.volatile:
             for v in batch:
@@ -53,20 +53,22 @@ class CTC(model.Model):
 
     def infer_batch(self, batch, calculate_loss=False):
         x, y, x_lens, y_lens = self.collate(*batch)
-        probs = self.forward_impl(x, softmax=True)
+        probs = self.forward_impl(x, softmax=True).permute(1, 0, 2)
         if calculate_loss:
             loss = self.loss_func(probs, y, x_lens, y_lens)
         else:
             loss = None
-        probs = probs.data.cpu().numpy()
 
-        return [decode(p, beam_size=10, blank=self.blank)[0] for p in probs], y, loss
+        probs = probs.permute(1, 0, 2).data.cpu().numpy()
+        return [decode(p, beam_size=10, blank=self.blank)[0] for p in probs],\
+               [y[i, :s].tolist() for i, s in enumerate(y_lens)], loss
 
     def infer_recording(self, rec):
         probs = self.forward_impl(rec, softmax=True)
         probs = probs.data.cpu().numpy()
 
         return [decode(p, beam_size=10, blank=self.blank)[0] for p in probs]
+
 
     @staticmethod
     def max_decode(pred, blank):

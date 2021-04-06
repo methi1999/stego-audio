@@ -47,7 +47,7 @@ def load_transcripts(path):
     m60_48, _ = load_phone_map()
     files = glob.glob(pattern)
     print("Load Transcript:", path, files)
-    # Standard practic is to remove all "sa" sentences
+    # Standard practice is to remove all "sa" sentences
     # for each speaker since they are the same for all.
     filt_sa = lambda x: os.path.basename(x)[:2] != "sa"
     files = filter(filt_sa, files)
@@ -95,7 +95,8 @@ def build_json(data, path, set_name):
     with open(os.path.join(path, basename), 'w+') as fid:
         for k, t in tqdm.tqdm(data.items()):
             # print("Here", k, t)
-            wave_file = os.path.splitext(k)[0] + ".WAV" + os.path.extsep + WAV_EXT
+            # wave_file = os.path.splitext(k)[0] + ".WAV" + os.path.extsep + WAV_EXT
+            wave_file = os.path.splitext(k)[0] + ".wav"
             # wave_file = k + os.path.extsep + WAV_EXT
             dur = wav_duration(wave_file)
             datum = {'text': t,
@@ -106,14 +107,15 @@ def build_json(data, path, set_name):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Preprocess Timit dataset.")
+    # ../dataset
+    # parser = argparse.ArgumentParser(description="Preprocess Timit dataset.")
+    # parser.add_argument("output_directory", help="Path where the dataset is saved.")
+    # args = parser.parse_args()
+    # path = os.path.join(args.output_directory, "TIMIT")
 
-    parser.add_argument("output_directory",
-                        help="Path where the dataset is saved.")
-    args = parser.parse_args()
+    root = 'dataset'
+    path = os.path.join(root, "TIMIT")
 
-    path = os.path.join(args.output_directory, "TIMIT")
     path = os.path.abspath(path)
     if not os.path.exists(path):
         print("Making directory")
@@ -130,7 +132,7 @@ if __name__ == "__main__":
     print("Preprocessing dev")
     transcripts = load_transcripts(os.path.join(path, "TEST"))
     dev, test = split_by_speaker(transcripts)
-    build_json(dev, path, "dev")
+    build_json(dev, path, "DEV")
 
     print("Preprocessing test")
     build_json(test, path, "TEST")

@@ -33,7 +33,6 @@ class Preprocessor:
         audio_files = [d['audio'] for d in data]
         random.shuffle(audio_files)
         self.mean, self.std = compute_mean_std(self.audio_cfg, audio_files[:max_samples])
-        self.mean, self.std = torch.tensor(self.mean).squeeze(1), torch.tensor(self.std).squeeze(1)
         self._input_dim = self.mean.shape[0]
 
         # Make char map
@@ -63,14 +62,14 @@ class Preprocessor:
             e = text.index(self.END)
         return text[s:e]
 
-    def preprocess(self, audio_cfg, pth=None, audio=None, text=()):
+    def preprocess(self, pth=None, audio=None, text=()):
         if pth is not None:
-            inputs = log_specgram_from_file(audio_cfg, pth)
+            inputs = log_specgram_from_file(self.audio_cfg, pth)
         elif audio is not None:
-            inputs = log_specgram(audio_cfg, audio)
+            inputs = log_specgram(self.audio_cfg, audio)
         else:
             raise Exception("Either audio or pth should be None")
-        inputs = (inputs - torch.tensor(self.mean).unsqueeze(1)) / torch.tensor(self.std).unsqueeze(1)
+        inputs = (inputs - self.mean)/self.std
         targets = self.encode(text)
         return inputs.T, targets
 
@@ -87,10 +86,10 @@ class Preprocessor:
 
 
 def compute_mean_std(cfg, audio_files):
-    samples = [log_specgram_from_file(cfg, af) for af in audio_files]
-    samples = torch.vstack(samples)
-    mean = torch.mean(samples, dim=0)
-    std = torch.std(samples, dim=0)
+    samples = [log_specgram_from_file(cfg, af).T for af in audio_files]
+    samples = torch.cat(samples, dim=0)
+    mean = torch.mean(samples, dim=0).unsqueeze(1)
+    std = torch.std(samples, dim=0).unsqueeze(1)
     return mean, std
 
 
@@ -125,8 +124,7 @@ class AudioDataset(tud.Dataset):
 
     def __getitem__(self, idx):
         datum = self.data[idx]
-        datum = self.preproc.preprocess(datum["audio"],
-                                        datum["text"])
+        datum = self.preproc.preprocess(pth=datum["audio"], text=datum["text"])
         return datum
 
 
@@ -150,7 +148,8 @@ class BatchRandomSampler(tud.sampler.Sampler):
         return len(self.data_source)
 
 
-def make_loader(dataset_json, preproc, batch_size, num_workers=4):
+# Todo: increase workers when code is running properly
+def make_loader(dataset_json, preproc, batch_size, num_workers=1):
     dataset = AudioDataset(dataset_json, preproc)
     sampler = BatchRandomSampler(dataset, batch_size)
     loader = tud.DataLoader(dataset,
