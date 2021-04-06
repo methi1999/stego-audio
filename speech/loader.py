@@ -33,6 +33,7 @@ class Preprocessor:
         audio_files = [d['audio'] for d in data]
         random.shuffle(audio_files)
         self.mean, self.std = compute_mean_std(self.audio_cfg, audio_files[:max_samples])
+        self.mean, self.std = torch.tensor(self.mean).squeeze(1), torch.tensor(self.std).squeeze(1)
         self._input_dim = self.mean.shape[0]
 
         # Make char map
@@ -69,9 +70,12 @@ class Preprocessor:
             inputs = log_specgram(audio_cfg, audio)
         else:
             raise Exception("Either audio or pth should be None")
-        inputs = (inputs - self.mean[: ,None]) / self.std[:, None]
+        inputs = (inputs - torch.tensor(self.mean).unsqueeze(1)) / torch.tensor(self.std).unsqueeze(1)
         targets = self.encode(text)
         return inputs.T, targets
+
+    def invert_norm(self, spec):
+        return spec * self.std[:, None] + self.mean[:, None]
 
     @property
     def input_dim(self):

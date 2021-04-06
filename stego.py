@@ -16,19 +16,19 @@ from speech.utils.io import wave_from_array
 from speech.utils.io import array_from_wave
 import speech.models as models
 
-# TODO, (awni) why does putting this above crash..
 import tensorboard_logger as tb
 
 
-def inverse_delta(config, spectrogram, name='stego_aud.wav'):
+def inverse_delta(config, spectrogram, preproc, name='stego_aud.wav'):
     fs = config['fs']
     tx = torchaudio.transforms.GriffinLim(n_fft=config['win_size'] * fs // 1000,
                                           win_length=config['win_size'] * fs // 1000,
                                           hop_length=config['step_size'] * fs // 1000,
                                           window_fn=torch.hann_window)
-    # write output
+    # undo normalisation and take inverse log i.e. exp
+    spectrogram = torch.exp(preproc.invert_norm(spectrogram))
+    # transform and write
     wave_from_array(tx(spectrogram), fs, name)
-
 
 
 def stego_spectro(config, audio_pth='tests/test1.wav', target_text=('aa', 'jh')):
@@ -48,7 +48,7 @@ def stego_spectro(config, audio_pth='tests/test1.wav', target_text=('aa', 'jh'))
     # Optimizer
     optimizer = torch.optim.Adam([delta], lr=0.01)
 
-    for e in range(10000):
+    for e in range(1, 10000):
         to_feed = orig + delta
         inp = to_feed.unsqueeze(0)
         batch = (inp, target)
@@ -63,20 +63,10 @@ def stego_spectro(config, audio_pth='tests/test1.wav', target_text=('aa', 'jh'))
             print("Iteration: {}, Loss: {}, cur_out: {}, d_max: {}".format(e, loss, cur_out, d_max))
             if cur_out == target[0].tolist():
                 print("Got target output")
-                inverse_delta(config, to_feed.detach().T, name='matching')
-            if e % 1000 == 0:
+                inverse_delta(config, to_feed.detach().T, preproc, name='matching')
+            if e % 100 == 0:
                 print("Writing audio")
-                inverse_delta(config, to_feed.detach().T)
-
-
-def audio_to_logspec(config, arr, eps=1e-10):
-    fs = config['fs']
-    tx = torchaudio.transforms.Spectrogram(n_fft=config['win_size'] * fs // 1000,
-                                           win_length=config['win_size'] * fs // 1000,
-                                           hop_length=config['step_size'] * fs // 1000,
-                                           window_fn=torch.hann_window)
-    to_feed = torch.log(tx(arr) + eps).T
-    return to_feed
+                inverse_delta(config, to_feed.detach().T, preproc)
 
 
 def stego_audio(config, audio_pth='tests/test1.wav', target_text=('cl', 'dh')):
@@ -104,8 +94,7 @@ def stego_audio(config, audio_pth='tests/test1.wav', target_text=('cl', 'dh')):
 
     for e in range(10000):
         # optimizer
-        prev_delta = delta.clone()
-        to_feed = audio_to_logspec(config, orig + delta)
+        to_feed, _ = preproc.preprocess(config, audio=orig+delta)
         inp = to_feed.unsqueeze(0)
         batch = (inp, target)
         optimizer.zero_grad()
@@ -120,7 +109,7 @@ def stego_audio(config, audio_pth='tests/test1.wav', target_text=('cl', 'dh')):
         if e % 50 == 0:
             d_max = delta.max().item()
             cur_out = list(model.infer_batch(batch)[0][0])
-            print("Change: {}".format(torch.abs(orig - delta).sum()))
+            print("Delta: {}".format(torch.abs(orig - delta).sum()))
             print("Iteration: {}, Loss: {}, cur_out: {}, d_max: {}, thresh: {}".format(e, loss, cur_out, d_max, thresh))
             to_write = orig + delta.clone().detach()
             wave_from_array(to_write, fs, 'aud.wav')
