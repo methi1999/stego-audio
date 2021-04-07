@@ -3,7 +3,7 @@ notebooks/
 dataset/
 ctc_best/*
 !ctc_best/best_model
-!ctc_best/best_preproc.pyc
+!ctc_best/best_preproc
 
 # vim
 .*.swp
