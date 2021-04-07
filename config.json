@@ -18,7 +18,7 @@
         "batch_size" : 64,
         "epochs" : 1000,
         "learning_rate" : 3e-3,
-        "momentum" : 0.99
+        "momentum" : 0.95
     },
 
     "model" : {

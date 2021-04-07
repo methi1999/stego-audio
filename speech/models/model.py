@@ -72,10 +72,9 @@ class Model(nn.Module):
 
         x, h = self.rnn(x)
 
-        if self.rnn.bidirectional:
-            half = x.size()[-1] // 2
-            x = x[:, :, :half] + x[:, :, half:]
-
+        # if self.rnn.bidirectional:
+        #     half = x.size()[-1] // 2
+        #     x = x[:, :, :half] + x[:, :, half:]
         return x
 
     def loss(self, x, y):
@@ -111,27 +110,6 @@ class Model(nn.Module):
     @property
     def encoder_dim(self):
         return self._encoder_dim
-
-
-class LinearND(nn.Module):
-
-    def __init__(self, *args):
-        """
-        A torch.nn.Linear layer modified to accept ND arrays.
-        The function treats the last dimension of the input
-        as the hidden dimension.
-        """
-        super(LinearND, self).__init__()
-        self.fc = nn.Linear(*args)
-
-    def forward(self, x):
-        size = x.size()
-        n = int(np.prod(size[:-1]))
-        out = x.contiguous().view(n, size[-1])
-        out = self.fc(out)
-        size = list(size)
-        size[-1] = out.size()[-1]
-        return out.view(size)
 
 
 def zero_pad_concat(inputs, feat_or_target, fill_value=0):

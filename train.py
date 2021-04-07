@@ -64,10 +64,10 @@ def eval_dev(model, ldr, preproc):
             losses.append(loss.item())
             all_preds.extend(preds)
             all_labels.extend(labels)
-    # loss = sum(losses) / len(losses)
+    loss = sum(losses) / len(losses)
     results = [(preproc.decode(l), preproc.decode(p)) for l, p in zip(all_labels, all_preds)]
     cer = speech.compute_cer(results)
-    print("Dev: Loss {:.3f}, CER {:.3f}".format(100, cer))
+    print("Dev: Loss {:.3f}, CER {:.3f}".format(loss, cer))
     return loss, cer
 
 
@@ -76,32 +76,28 @@ def run(config, use_cuda):
     data_cfg = config["data"]
     model_cfg = config["model"]
     aud_cfg = config['audio']
-
-    print("Epochs to train:", opt_cfg["epochs"])
-    # Loaders
     batch_size = opt_cfg["batch_size"]
-    # preprocessor stores data and functions to encode/decode text
-    preproc = loader.Preprocessor(data_cfg["train_set"], aud_cfg, start_and_end=data_cfg["start_and_end"])
 
-    # preproc_d = loader.Preprocessor(data_cfg["dev_set"],
-    #                               start_and_end=data_cfg["start_and_end"])
+    load_pre = True
 
+    if load_pre:
+        # Todo: add code for checking if pretrained actually exists. If not, init model and rest
+        model, _, preproc = speech.load("ctc_best", tag="best")
+    else:
+        preproc = loader.Preprocessor(data_cfg["train_set"], aud_cfg, start_and_end=data_cfg["start_and_end"])
+        # eval('print("Hello")') will actually call print("Hello")
+        model_class = eval("models." + model_cfg["class"])
+        # define model
+        model = model_class(preproc.input_dim, preproc.vocab_size, model_cfg)
+
+    model = model.cuda() if use_cuda else model.cpu()
+    optimizer = torch.optim.SGD(model.parameters(), lr=opt_cfg["learning_rate"],
+                                momentum=opt_cfg["momentum"])
     # Dataloader is a subclass of pytorch.utils.dataloader. Can iterate
     train_ldr = loader.make_loader(data_cfg["train_set"], preproc, batch_size)
     dev_ldr = loader.make_loader(data_cfg["dev_set"], preproc, batch_size)
 
-    # eval('print("Hello")') will actually call print("Hello")
-    model_class = eval("models." + model_cfg["class"])
-    # define model
-    model = model_class(preproc.input_dim, preproc.vocab_size, model_cfg)
-    # model, preproc = speech.load("ctc_models_MOMENTUM", tag="best")
-    model = model.cuda() if use_cuda else model.cpu()
-
-    # can try out Adam
-    optimizer = torch.optim.SGD(model.parameters(), lr=opt_cfg["learning_rate"],
-                                momentum=opt_cfg["momentum"])
-
-    speech.save(model, optimizer, preproc, config["save_path"])
+    print("Epochs to train:", opt_cfg["epochs"])
     run_state = (0, 0)
     best_so_far = float("inf")
     for e in range(opt_cfg["epochs"]):

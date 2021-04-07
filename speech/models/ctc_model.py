@@ -4,6 +4,7 @@ from __future__ import print_function
 
 
 import torch
+import torch.nn as nn
 from torch.nn import CTCLoss
 from . import model
 from .ctc_decoder import decode
@@ -15,7 +16,10 @@ class CTC(model.Model):
 
         # include the blank token
         self.blank = output_dim
-        self.fc = model.LinearND(self.encoder_dim, output_dim + 1)
+        fc_inp_dim = self.encoder_dim
+        if config['encoder']['rnn']['bidirectional']:
+            fc_inp_dim *= 2
+        self.fc = nn.Linear(fc_inp_dim, output_dim + 1)
         self.loss_func = CTCLoss(blank=self.blank)
 
     def forward(self, batch):
@@ -34,14 +38,14 @@ class CTC(model.Model):
     def loss(self, batch):
         x, y, x_lens, y_lens = self.collate(*batch)
         out = self.forward_impl(x).permute(1, 0, 2)
-
+        # print(out.size(), y.size(), x_lens.size(), y_lens.size())
         loss = self.loss_func(out, y, x_lens, y_lens)
         return loss
 
     def collate(self, inputs, labels):
         max_t = max(i.shape[0] for i in inputs)
         max_t = self.conv_out_size(max_t, 0)
-        x_lens = torch.full((len(inputs), 1), fill_value=max_t, dtype=torch.long)
+        x_lens = torch.full((len(inputs),), fill_value=max_t, dtype=torch.long)
         x = model.zero_pad_concat(inputs, 'feat')
         y_lens = torch.tensor([len(l) for l in labels], dtype=torch.long)
         y = model.zero_pad_concat([torch.tensor(l) for l in labels], 'target', fill_value=self.blank)

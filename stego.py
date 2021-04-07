@@ -34,10 +34,10 @@ def inverse_delta(config, spectrogram, preproc, name='stego_aud.wav'):
 def stego_spectro(config, audio_pth='tests/test1.wav', target_text=('aa', 'jh')):
     config = config['audio']
     # load model
-    model, preproc = speech.load("ctc_models_MOMENTUM", tag="best")
+    model, _, preproc = speech.load("ctc_best", tag="best")
     model = model.cuda() if use_cuda else model.cpu()
     # load audio file as a spectogram
-    orig, _ = preproc.preprocess(config, pth=audio_pth)
+    orig, _ = preproc.preprocess(pth=audio_pth)
     # pass through model to get original text
     out = model.infer_recording(orig.unsqueeze(0))[0]
     print("Decoded text in audio:", preproc.decode(out))
@@ -63,22 +63,22 @@ def stego_spectro(config, audio_pth='tests/test1.wav', target_text=('aa', 'jh'))
             print("Iteration: {}, Loss: {}, cur_out: {}, d_max: {}".format(e, loss, cur_out, d_max))
             if cur_out == target[0].tolist():
                 print("Got target output")
-                inverse_delta(config, to_feed.detach(), preproc, name='matching')
+                inverse_delta(config, to_feed.detach(), preproc, name='spectro_best')
             if e % 100 == 0:
                 print("Writing audio")
-                inverse_delta(config, to_feed.detach(), preproc)
+                inverse_delta(config, to_feed.detach(), preproc, name='spectro_hypo')
 
 
-def stego_audio(config, audio_pth='tests/timit.wav', target_text=('cl', 'dh', 'sil')):
+def stego_audio(config, audio_pth='tests/timit.wav', target_text=("ix", "v", "ih", "vcl", "jh", "uw", "el", "zh", "vcl", "jh", "eh", "n")):
     # config['audio'] contains hop, window and fs params
     config = config['audio']
     # load model
-    model, preproc = speech.load("ctc_models_MOMENTUM", tag="best")
+    model, _, preproc = speech.load("ctc_best", tag="best")
     model = model.cuda() if use_cuda else model.cpu()
     # load audio file as a spectrogram
     orig, fs = array_from_wave(audio_pth)
     assert config['fs'] == fs
-    orig_spec, _ = preproc.preprocess(config, audio=orig)
+    orig_spec, _ = preproc.preprocess(audio=orig)
     # pass through model to get original text
     out = model.infer_recording(orig_spec.unsqueeze(0))[0]
     print("Decoded text in audio:", preproc.decode(out))
@@ -94,7 +94,7 @@ def stego_audio(config, audio_pth='tests/timit.wav', target_text=('cl', 'dh', 's
 
     for e in range(10000):
         # optimizer
-        to_feed, _ = preproc.preprocess(config, audio=orig+delta)
+        to_feed, _ = preproc.preprocess(audio=orig+delta)
         inp = to_feed.unsqueeze(0)
         batch = (inp, target)
         optimizer.zero_grad()
@@ -112,10 +112,10 @@ def stego_audio(config, audio_pth='tests/timit.wav', target_text=('cl', 'dh', 's
             print("Delta: {}".format(torch.abs(orig - delta).sum()))
             print("Iteration: {}, Loss: {}, cur_out: {}, d_max: {}, thresh: {}".format(e, loss, cur_out, d_max, thresh))
             to_write = orig + delta.clone().detach()
-            wave_from_array(to_write, fs, 'aud.wav')
+            wave_from_array(to_write, fs, 'aud_hypo.wav')
             if cur_out == target[0].tolist():
                 print("Got target output")
-                wave_from_array(to_write, fs, 'best.wav')
+                wave_from_array(to_write, fs, 'aud_best.wav')
                 thresh = thresh_decay*min(thresh, delta.max())
 
 
@@ -130,5 +130,5 @@ if __name__ == "__main__":
     tb.configure(config["save_path"])
     use_cuda = torch.cuda.is_available()
 
-    # stego_spectro(config)
-    stego_audio(config)
+    stego_spectro(config)
+    # stego_audio(config)
