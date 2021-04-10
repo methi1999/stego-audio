@@ -2,7 +2,7 @@
 	It is a female voice.
 
 2) Out of the 12 (unique) target phones, change the front three (replace):
- 	Our target phone list is:("ay", "ae", "b", "aa", "f", "uw", "el", "zh", "vcl", "jh", "eh", "n")
+ 	Our target phone list is:("aa", "ay", "ih", "f", "jh", "uw", "el", "zh", "vcl", "jh", "eh", "n")
 	
 
 3) Rishabh going to change the phones by 75%, he will work on a different voice altogether.
