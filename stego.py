@@ -19,7 +19,7 @@ import speech.models as models
 import tensorboard_logger as tb
 
 
-def inverse_delta(config, spectrogram, preproc, name='stego_aud.wav'):
+def inverse_delta(config, spectrogram, preproc, name):
     fs = config['fs']
     tx = torchaudio.transforms.GriffinLim(n_fft=config['win_size'] * fs // 1000,
                                           win_length=config['win_size'] * fs // 1000,
@@ -28,7 +28,7 @@ def inverse_delta(config, spectrogram, preproc, name='stego_aud.wav'):
     # undo normalisation and take inverse log i.e. exp
     spectrogram = torch.exp(preproc.invert_norm(spectrogram))
     # transform and write
-    wave_from_array(tx(spectrogram), fs, name)
+    wave_from_array(tx(spectrogram), fs, name+'.wav')
 
 
 def stego_spectro(config, audio_pth='tests/test1.wav', target_text=('aa', 'jh')):
@@ -61,12 +61,14 @@ def stego_spectro(config, audio_pth='tests/test1.wav', target_text=('aa', 'jh'))
             delta = torch.clamp(delta, max=d_max * 0.8).detach()
             cur_out = list(model.infer_batch(batch)[0][0])
             print("Iteration: {}, Loss: {}, cur_out: {}, d_max: {}".format(e, loss, cur_out, d_max))
+            # transpose to convert it from time x freq to freq x time
+            to_feed = to_feed.detach().squeeze().T
             if cur_out == target[0].tolist():
                 print("Got target output")
-                inverse_delta(config, to_feed.detach(), preproc, name='spectro_best')
+                inverse_delta(config, to_feed, preproc, name='spectro_best')
             if e % 100 == 0:
                 print("Writing audio")
-                inverse_delta(config, to_feed.detach(), preproc, name='spectro_hypo')
+                inverse_delta(config, to_feed, preproc, name='spectro_hypo')
 
 
 def stego_audio(config, audio_pth='tests/timit.wav', target_text=("ix", "v", "ih", "vcl", "jh", "uw", "el", "zh", "vcl", "jh", "eh", "n")):
@@ -130,5 +132,5 @@ if __name__ == "__main__":
     tb.configure(config["save_path"])
     use_cuda = torch.cuda.is_available()
 
-    stego_spectro(config)
-    # stego_audio(config)
+    # stego_spectro(config)
+    stego_audio(config)
