@@ -1,7 +1,4 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
+from pesq import pesq
 import editdistance
 
 
@@ -13,7 +10,23 @@ def compute_cer(results):
 
     Returns the CER for the full set.
     """
-    dist = sum(editdistance.eval(label, pred)
-                for label, pred in results)
+    dist = sum(editdistance.eval(label, pred) for label, pred in results)
     total = sum(len(label) for label, _ in results)
     return dist / total
+
+
+def pesq_score(ref, deg, rate, band='wb'):
+    """
+    ref: reference/clean audio
+    deg: degraded version
+    rate: sampling rate
+    band: wb or nb (wide-band or narrow-band)
+    """
+    return pesq(rate, ref, deg, band)
+
+
+if __name__ == '__main__':
+    from scipy.io.wavfile import read
+    fs, a = read('../../final/rec_3.wav')
+    _, b = read('../../final/rec_3_asr.wav')
+    print(pesq_score(a, b, fs, band='nb'))

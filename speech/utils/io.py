@@ -38,8 +38,10 @@ def load(path, tag=""):
 
 def array_from_wave(file_name):
     samp_rate, audio = read(file_name)
-    assert audio.max() > 1
-    audio = torch.tensor(audio).float()/32768
+    audio = torch.tensor(audio).float()
+    # Todo: Fix this. Current implementation is jugaad
+    if np.abs(audio).max() > 10:  # integers
+        audio /= 32768
     return audio, samp_rate
 
 
