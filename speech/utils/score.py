@@ -15,7 +15,7 @@ def compute_cer(results):
     return dist / total
 
 
-def pesq_score(ref, deg, rate, band='wb'):
+def pesq_score(ref, deg, rate, band):
     """
     ref: reference/clean audio
     deg: degraded version
@@ -27,6 +27,6 @@ def pesq_score(ref, deg, rate, band='wb'):
 
 if __name__ == '__main__':
     from scipy.io.wavfile import read
-    fs, a = read('../../final/rec_3.wav')
-    _, b = read('../../final/rec_3_asr.wav')
+    fs, a = read('../../recordings/destroyer.wav')
+    _, b = read('../../recordings/destroyer_enc_oldd.wav')
     print(pesq_score(a, b, fs, band='nb'))

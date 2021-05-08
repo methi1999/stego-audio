@@ -1,4 +1,3 @@
-
 import json
 import random
 import pickle
@@ -11,7 +10,7 @@ import speech
 from speech.utils.io import wave_from_array
 from speech.utils.io import array_from_wave
 import speech.models as models
-from speech.utils.score import pesq_score
+from speech.utils.score import pesq_score, compute_cer
 
 import tensorboard_logger as tb
 
@@ -68,11 +67,11 @@ def stego_spectro(config, audio_pth='tests/test1.wav', target_text=('aa', 'jh'))
                 inverse_delta(config, to_feed, preproc, name='spectro_hypo')
 
 
-def stego_audio(config, audio_pth='tests/timit.wav', target_text=('hh', 'ah', 'l', 'ow', 'sil', 'w', 'er', 'l', 'd')):
+def stego_audio(config_full, add_noise, audio_pth='tests/timit.wav',
+                target_text=('hh', 'ah', 'l', 'ow', 'sil', 'w', 'er', 'l', 'd')):
     # config['audio'] contains hop, window and fs params
-    config = config['audio']
+    config = config_full['audio']
     hypo_path = audio_pth[:-4] + '_hypo.wav'
-    best_path = audio_pth[:-4] + '_enc.wav'
     # load model
     model, _, preproc = speech.load("ctc_best", tag="best")
     # Freeze model params. Even if we don't, it doesnt matter since optimiser has only been passed delta as param
@@ -86,23 +85,33 @@ def stego_audio(config, audio_pth='tests/timit.wav', target_text=('hh', 'ah', 'l
     orig_spec, _ = preproc.preprocess(audio=orig)
     # pass through model to get original text
     out = model.infer_recording(orig_spec.unsqueeze(0))[0]
-    print("Decoded text in audio: {}\nSequence: {}".format(preproc.decode(out), out))
+    print("Decoded text in audio: {}\nDecoded Sequence: {}".format(preproc.decode(out), out))
     # define delta
     delta = nn.Parameter(torch.zeros_like(orig), requires_grad=True).float()
     target = torch.tensor(preproc.encode(target_text)).unsqueeze(0)
+    target_list = target[0].tolist()
     print("Target to encode:", target[0])
-
+    edit_dists = [compute_cer([(target_list, out)])]
+    # parameters
     thresh = orig.max()/3
     thresh_decay = 0.75
     check_every = 50
+    num_iter = 30000
+    # RMS/3 ToDo: convert to SNR based calculation
+    if add_noise:
+        noise_sigma = torch.sqrt(torch.mean(orig**2)).item()/3
+        print("Noise sigma:", noise_sigma)
     # optimizer
     optimizer = torch.optim.Adam([delta], lr=0.01)
     lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.995, verbose=True)
     lr_step = 50
-    losses = []
+    logs, losses = [], []
 
-    for e in range(1, 30000):
+    for e in range(1, num_iter):
         # optimizer
+        audio_to_feed = orig+delta
+        if add_noise:
+            audio_to_feed += torch.normal(mean=0, std=noise_sigma, size=audio_to_feed.size())
         to_feed, _ = preproc.preprocess(audio=orig+delta)
         inp = to_feed.unsqueeze(0)
         batch = (inp, target)
@@ -116,12 +125,23 @@ def stego_audio(config, audio_pth='tests/timit.wav', target_text=('hh', 'ah', 'l
             print("Iteration: {}, Loss: {}, cur_out: {}, d_max: {}, thresh: {}".format(e, loss, cur_out, d_max, thresh))
             to_write = orig + delta.clone().detach()
             wave_from_array(to_write, fs, hypo_path)
-            if cur_out == target[0].tolist():
+            # store edit distance
+            edit_dists.append((e, compute_cer([(target_list, cur_out)])))
+            print(edit_dists)
+            if cur_out == target_list:
                 print("Got target output")
+                best_path = audio_pth[:-4] + '_enc_' + str(e) + '.wav'
                 wave_from_array(to_write, fs, best_path)
                 thresh = thresh_decay*min(thresh, d_max)
-                cur_pesq = pesq_score(orig.numpy(), to_write.numpy(), fs, 'wb')
-                print('PESQ score: {}'.format(cur_pesq))
+                pesq_nb = pesq_score(orig.numpy(), to_write.numpy(), fs, 'nb')
+                pesq_wb = pesq_score(orig.numpy(), to_write.numpy(), fs, 'wb')
+                print('PESQ score: {} {}'.format(pesq_nb, pesq_wb))
+                logs.append((e, pesq_nb, pesq_wb))
+
+                # dump data
+                pkl_path = audio_pth[:-4] + '_data.pkl'
+                with open(pkl_path, 'wb') as f:
+                    pickle.dump((losses, logs, edit_dists), f)
 
         loss.backward()
         losses.append(loss.item())
@@ -133,8 +153,11 @@ def stego_audio(config, audio_pth='tests/timit.wav', target_text=('hh', 'ah', 'l
         if e % lr_step == 0:
             lr_scheduler.step()
 
-    with open('final_losses.pkl', 'wb') as f:
-        pickle.dump(losses, f)
+    return losses, logs, edit_dists
+
+
+# def pesq_vs_iter():
+
 
 
 if __name__ == "__main__":
@@ -152,7 +175,7 @@ if __name__ == "__main__":
     target = ('sil', 'ao', 't', 'ah', 'm', 'ae', 't', 'ih', 'k', 'sil', 's', 'p', 'iy', 'ch', 'sil', 'r', 'eh', 'k', 'ah',
               'g', 'n', 'uh', 'sh', 'ah', 'n', 'sil')
     # stego_spectro(config)
-    stego_audio(config, audio_pth='recordings/destroyer.wav', target_text=target)
+    stego_audio(config, add_noise=True, audio_pth='recordings/destroyer.wav', target_text=target)
 
     # can get phase from audio by setting power=None in spectrogram but GriffinLim does not accept it as input
     # so no point, otherwise we find other functions/libraries which can invert spectrogram
