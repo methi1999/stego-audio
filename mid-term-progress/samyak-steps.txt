@@ -1,0 +1,10 @@
+1) Save TIMIT/TEST/DR1/FAKS0/SA1.wav as timit.wav in ASR-Project-Samyak Drive folder
+	It is a female voice.
+
+2) Original phone sequence ("sil", "sh", "iy", "hv", "ae", "dcl", "d", "y", "er", "dcl", "d", "aa", "r", "kcl", "k", "s", "uw", "dx", "ih", "ng", "gcl", "g", "r", "iy", "s", "iy", "w", "aa", "sh", "epi", "wa", "dx", "er", "q", "ao", "l", "y", "iy", "axr"  "sil")
+	Text: She had your dark suit in greasy wash water all year
+	
+3) Target phone sequence ("sil", "f", "aa", "r", "bcl", "b", "ax", "kcl", "k", "s", "pcl", "p", "ix", "kcl", "t", "ey", "sh", "en", "tcl", "s", "sil")
+	Text: Far below expectations (from TIMIT/TEST/DR1/FAKS0/SI943.wav)	
+
+4) Rishabh going to change the phones by 75%, will work on a different voice altogether (preferably different gender and a shorter sentence but longer encoded text).

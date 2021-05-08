@@ -1,0 +1,7 @@
+1. Audio file TEST/DR8/MDAW1/SX13.WAV
+
+2. Original phone sequence ("sil", "s", "epi", "w", "ih", "ng", "y", "er", "aa", "r", "m", "ix", "z", "hh", "ay", "ix", "zh", "uw", "cl", "k", "ae", "n", "sil")
+	Text: Swing your arm as high as you can
+	21 phones
+3. Target phone sequence ("sil", "cl", "k", "l", "iy", "n", "y", "er", "oy", "l", "iy", "r", "ae", "vcl", "g", "l", "ay", "cl", "dh", "ae", "cl", "t", "sil")
+	Text: Clean your oily rag like that
