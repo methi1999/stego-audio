@@ -1,9 +1,11 @@
 import json
+import time
 import random
 import pickle
 import torch
 import torch.nn as nn
 import torch.optim
+import argparse
 
 import torchaudio
 import speech
@@ -81,6 +83,7 @@ def stego_audio(config_full, add_noise, audio_pth='tests/timit.wav',
     model = model.cuda() if use_cuda else model.cpu()
     # load audio file as a spectrogram
     orig, fs = array_from_wave(audio_pth)
+    print(fs)
     assert config['fs'] == fs
     orig_spec, _ = preproc.preprocess(audio=orig)
     # pass through model to get original text
@@ -120,6 +123,9 @@ def stego_audio(config_full, add_noise, audio_pth='tests/timit.wav',
 
         if e % check_every == 0:
             cur_out = list(model.infer_batch(batch)[0][0])
+            global start_time
+            print(start_time)
+            print("Time taken for", check_every, "iterations:", time.time() - start_time)
             print("Delta: {}".format(torch.abs(orig - delta).sum()))
             d_max = delta.max().item()
             print("Iteration: {}, Loss: {}, cur_out: {}, d_max: {}, thresh: {}".format(e, loss, cur_out, d_max, thresh))
@@ -158,9 +164,22 @@ def stego_audio(config_full, add_noise, audio_pth='tests/timit.wav',
 
 # def pesq_vs_iter():
 
+def load_targets(path):
+    with open(path, "r") as f:
+        lines = f.readlines()
+    phones = [i.strip() for i in lines]
+    phones = (" ".join(phones)).strip().split(" ")
+    return phones
 
+# start_time = None
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--audio_path", help="Path to audio file on which to encrypt text")
+    parser.add_argument("--target", help='Path to target phone sequence file')
+    parser.add_argument("--noise", help='Add gaussian noise: 0/1 value', default=0)
+    args = parser.parse_args()
+
     cfg_path = 'config.json'
 
     with open(cfg_path, 'r') as fid:
@@ -171,12 +190,15 @@ if __name__ == "__main__":
     tb.configure(config["save_path"])
     # use_cuda = torch.cuda.is_available()
     use_cuda = False
-
-    target = ('sil', 'ao', 't', 'ah', 'm', 'ae', 't', 'ih', 'k', 'sil', 's', 'p', 'iy', 'ch', 'sil', 'r', 'eh', 'k', 'ah',
-              'g', 'n', 'uh', 'sh', 'ah', 'n', 'sil')
+    global start_time
+    start_time = time.time()
+    # target = ('sil', 'ao', 't', 'ah', 'm', 'ae', 't', 'ih', 'k', 'sil', 's', 'p', 'iy', 'ch', 'sil', 'r', 'eh', 'k', 'ah',
+              # 'g', 'n', 'uh', 'sh', 'ah', 'n', 'sil')
+    target = load_targets(args.target)
+    print(target)
     # stego_spectro(config)
-    stego_audio(config, add_noise=True, audio_pth='recordings/destroyer.wav', target_text=target)
-
+    stego_audio(config, add_noise=int(args.noise), audio_pth=args.audio_path, target_text=target)
+    print("Time taken by script:", time.time() - start_time)
     # can get phase from audio by setting power=None in spectrogram but GriffinLim does not accept it as input
     # so no point, otherwise we find other functions/libraries which can invert spectrogram
 
