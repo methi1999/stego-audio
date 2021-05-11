@@ -67,10 +67,10 @@ def stego_spectro(config, audio_pth='tests/test1.wav', target_text=('aa', 'jh'))
                 inverse_delta(config, to_feed, preproc, name='spectro_hypo')
 
 
-def stego_audio(config_full, audio_pth, add_noise, inp_target, is_text, dump_suffix=''):
+def stego_audio(config_full, audio_pth, noise_snr, inp_target, is_text, dump_suffix=''):
     # config['audio'] contains hop, window and fs params
-    if add_noise:
-        dump_suffix += '_noise'
+    if noise_snr is not None:
+        dump_suffix += '_noise_' + str(noise_snr)
     config = config_full['audio']
     hypo_path = audio_pth[:-4] + '_hypo.wav'
     pkl_path = audio_pth[:-4] + '_{}.pkl'.format(dump_suffix)
@@ -105,9 +105,9 @@ def stego_audio(config_full, audio_pth, add_noise, inp_target, is_text, dump_suf
     check_every = 50
     num_iter = 10000
     # RMS/3 ToDo: convert to SNR based calculation
-    if add_noise:
-        noise_sigma = torch.sqrt(torch.mean(orig**2)).item()/3
-        print("Noise sigma:", noise_sigma)
+    if noise_snr is not None:
+        noise_std = (torch.mean(orig**2).item()/(10**(noise_snr/10)))**0.5
+        print("Noise std:", noise_std)
     # optimizer
     optimizer = torch.optim.Adam([delta], lr=0.01)
     lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.995, verbose=True)
@@ -117,8 +117,8 @@ def stego_audio(config_full, audio_pth, add_noise, inp_target, is_text, dump_suf
     for e in range(1, num_iter):
         # optimizer
         audio_to_feed = orig+delta
-        if add_noise:
-            audio_to_feed += torch.normal(mean=0, std=noise_sigma, size=audio_to_feed.size())
+        if noise_snr is not None:
+            audio_to_feed += torch.normal(mean=0, std=noise_std, size=audio_to_feed.size())
         to_feed, _ = preproc.preprocess(audio=orig+delta)
         inp = to_feed.unsqueeze(0)
         batch = (inp, target)
@@ -201,17 +201,17 @@ if __name__ == "__main__":
     s4 = 'k ow d sil r eh d'.split(' ')
 
     # make sets of examples
-    egs = [('recordings/test.wav', s1, 'nuclear', True), ('recordings/test.wav', get_random(15), 'rand', False),
-           ('recordings/walter.wav', s2, 'shyam', True), ('recordings/walter.wav', get_random(15), 'rand', False),
-           ('recordings/destroyer.wav', s4, 'code_red', True), ('recordings/destroyer.wav', get_random(40), 'rand', False)]
+    egs = [('Final Audio/test.wav', s1, 'nuclear', True), ('Final Audio/test.wav', get_random(15), 'rand', False),
+           ('Final Audio/walter.wav', s2, 'shyam', True), ('Final Audio/walter.wav', get_random(15), 'rand', False),
+           ('Final Audio/destroyer.wav', s4, 'code_red', True), ('Final Audio/destroyer.wav', get_random(15), 'rand', False)]
 
     if args.a == 'all':
         for rec_pth, to_enc, suffix, is_text in egs:
             # stego_spectro(config)
-            stego_audio(config, audio_pth=rec_pth, add_noise=False, inp_target=to_enc, is_text=is_text, dump_suffix=suffix)
+            stego_audio(config, audio_pth=rec_pth, noise_snr=10, inp_target=to_enc, is_text=is_text, dump_suffix=suffix)
     else:
         idx = int(args.a)
-        stego_audio(config, audio_pth=egs[idx][0], add_noise=False, inp_target=egs[idx][1], is_text=egs[idx][3], dump_suffix=egs[idx][2])
+        stego_audio(config, audio_pth=egs[idx][0], noise_snr=10, inp_target=egs[idx][1], is_text=egs[idx][3], dump_suffix=egs[idx][2])
 
 
     # automatic speech recognition

@@ -45,4 +45,4 @@ def plot_noise():
 
 
 if __name__ == '__main__':
-    pesq_loss_edit_iter('../../recordings/destroyer_rand.pkl', '')
+    pesq_loss_edit_iter('../../Final Audio/destroyer_mithilesh/destroyer_code_red.pkl', '')
