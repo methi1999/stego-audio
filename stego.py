@@ -43,15 +43,18 @@ def stego_spectro(config, audio_pth='tests/test1.wav', target_text=('aa', 'jh'))
 
     # Optimizer
     optimizer = torch.optim.Adam([delta], lr=0.01)
+    optimizer.zero_grad()
+    step_every = 15
 
     for e in range(1, 10000):
         to_feed = orig + delta
         inp = to_feed.unsqueeze(0)
         batch = (inp, target)
-        optimizer.zero_grad()
         loss = model.loss(batch)
         loss.backward()
-        optimizer.step()
+        if e % step_every == 0:
+            optimizer.step()
+            optimizer.zero_grad()
         if e % 50 == 0:
             d_max = delta.max().item()
             delta = torch.clamp(delta, max=d_max * 0.9).detach()
@@ -110,6 +113,12 @@ def stego_audio(config_full, audio_pth, noise_snr, inp_target, is_text, dump_suf
         print("Noise std:", noise_std)
     # optimizer
     optimizer = torch.optim.Adam([delta], lr=0.01)
+    optimizer.zero_grad()
+    step_every = 5
+    # if we are not adding noise, need to step at every tier because same computation if delta not updated
+    if noise_snr is None:
+        step_every = 1
+
     lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.995, verbose=True)
     lr_step = 50
     logs, losses = [], []
@@ -119,10 +128,10 @@ def stego_audio(config_full, audio_pth, noise_snr, inp_target, is_text, dump_suf
         audio_to_feed = orig+delta
         if noise_snr is not None:
             audio_to_feed += torch.normal(mean=0, std=noise_std, size=audio_to_feed.size())
-        to_feed, _ = preproc.preprocess(audio=orig+delta)
+        to_feed, _ = preproc.preprocess(audio=audio_to_feed)
         inp = to_feed.unsqueeze(0)
         batch = (inp, target)
-        optimizer.zero_grad()
+
         loss = model.loss(batch)
 
         if e % check_every == 0:
@@ -151,8 +160,11 @@ def stego_audio(config_full, audio_pth, noise_snr, inp_target, is_text, dump_suf
 
         loss.backward()
         losses.append(loss.item())
-        optimizer.step()
-        # dont know why this worked
+        if e % step_every == 0:
+            optimizer.step()
+            optimizer.zero_grad()
+
+        # don't know why this worked
         with torch.no_grad():
             delta += delta.clamp_(min=-thresh, max=thresh) - delta
 
@@ -162,7 +174,6 @@ def stego_audio(config_full, audio_pth, noise_snr, inp_target, is_text, dump_suf
         if e % 200 == 0:
             with open(pkl_path, 'wb') as f:
                 pickle.dump((losses, logs, edit_dists), f)
-
 
     # dump data
     with open(pkl_path, 'wb') as f:
