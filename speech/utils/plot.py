@@ -25,6 +25,25 @@ def pesq_loss_edit_iter(pickle_path, title):
     # plt.grid(True)
     # plt.legend()
     # plt.show()
+    
+def pesq_loss_edit_iter_noise(pickle_path1, pickle_path2, title):
+    loss, pesq, edit = pickle.load(open(pickle_path1, 'rb'))
+    # pesq
+    iters = [x[0] for x in pesq]
+    wb, nb = [x[1] for x in pesq], [x[2] for x in pesq]
+    plt.plot(iters, wb, color='b', label='Without Noise', marker='x')
+    plt.title(title)
+    plt.xlabel("Iterations")
+    plt.ylabel("PESQ score")
+    plt.grid(True)
+
+    loss, pesq, edit = pickle.load(open(pickle_path2, 'rb'))
+    # pesq
+    iters = [x[0] for x in pesq]
+    wb, nb = [x[1] for x in pesq], [x[2] for x in pesq]
+    plt.plot(iters, wb, color='r', label='With Noise', marker='x')
+    plt.legend()
+    plt.show()
 
 
 def plot_noise():
