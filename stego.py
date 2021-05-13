@@ -24,49 +24,101 @@ def inverse_delta(config, spectrogram, preproc, name):
                                           hop_length=config['step_size'] * fs // 1000,
                                           window_fn=torch.hann_window)
     # undo normalisation and take inverse log i.e. exp
+    # print('spectrogram shape', spectrogram.shape)
     spectrogram = torch.exp(preproc.invert_norm(spectrogram))
     # transform and write
-    wave_from_array(tx(spectrogram), fs, name+'.wav')
+    temp = tx(spectrogram).detach().numpy()
+    # print("temp shape:", temp.shape)
+    wave_from_array(temp, fs, name+'.wav')
+    return temp
 
 
 def stego_spectro(config, audio_pth='tests/test1.wav', target_text=('aa', 'jh')):
     config = config['audio']
+    hypo_path = audio_pth[:-4] + "_stego_hypo.wav"
     # load model
     model, _, preproc = speech.load("ctc_best", tag="best")
+    # Freeze model parameters
+    for parameter in model.parameters():
+        parameter.requires_grad = False
     model = model.cuda() if use_cuda else model.cpu()
     # load audio file as a spectogram
-    orig, _ = preproc.preprocess(pth=audio_pth)
+    orig, fs = array_from_wave(audio_pth)
+    print(fs)
+    assert config['fs'] == fs
+    orig_spec, _ = preproc.preprocess(pth=audio_pth)
+    print("orig shape:", orig.shape, "\norig_spec shape:", orig_spec.shape)
     # pass through model to get original text
-    out = model.infer_recording(orig.unsqueeze(0))[0]
+    out = model.infer_recording(orig_spec.unsqueeze(0))[0]
     print("Decoded text in audio:", preproc.decode(out))
-    delta = nn.Parameter(torch.zeros_like(orig), requires_grad=True)
+    
+    delta = nn.Parameter(torch.zeros_like(orig_spec), requires_grad=True)
+    print("delta shape:", delta.shape)
     target = torch.tensor(preproc.encode(target_text)).unsqueeze(0)
+    target_list = target[0].tolist()
     print("Encoded target:", target[0])
-
+    edit_dists = [compute_cer([(target_list, out)])]
+    # parameters
+    thresh = orig.max()/3
+    thresh_decay = 0.75
+    check_every = 50
+    num_iter = 30000
     # Optimizer
     optimizer = torch.optim.Adam([delta], lr=0.01)
+    lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.995, verbose=True)
+    lr_step = 50
+    logs, losses = [], []
 
     for e in range(1, 10000):
-        to_feed = orig + delta
+        to_feed = orig_spec + delta
         inp = to_feed.unsqueeze(0)
         batch = (inp, target)
         optimizer.zero_grad()
         loss = model.loss(batch)
-        loss.backward()
-        optimizer.step()
-        if e % 50 == 0:
-            d_max = delta.max().item()
-            delta = torch.clamp(delta, max=d_max * 0.9).detach()
+        
+        if e % check_every == 0:
             cur_out = list(model.infer_batch(batch)[0][0])
-            print("Iteration: {}, Loss: {}, cur_out: {}, d_max: {}".format(e, loss, cur_out, d_max))
+            global start_time
+            print(start_time)
+            print("Time taken for", e, "iterations:", time.time() - start_time)
+            print("Delta: {}".format(torch.abs(orig_spec - delta).sum()))
+            d_max = delta.max().item()
+            # delta = torch.clamp(delta, max=d_max * 0.9).detach()
+            print("Iteration: {}, Loss: {}, cur_out: {}, d_max: {}, thresh: {}".format(e, loss, cur_out, d_max, thresh))
+            edit_dists.append((e, compute_cer([(target_list, cur_out)])))
+            print(edit_dists)
+            inverse_delta(config, to_feed, preproc, name=audio_pth[:-4] + '_spectro_hypo_'+str(e))
+            # to_write = orig_spec + delta.clone().detach()
             # transpose to convert it from time x freq to freq x time
-            to_feed = to_feed.detach().squeeze().T
+            # to_feed = to_feed.detach().squeeze().T
             if cur_out == target[0].tolist():
                 print("Got target output")
-                inverse_delta(config, to_feed, preproc, name='spectro_best')
-            if e % 100 == 0:
-                print("Writing audio")
-                inverse_delta(config, to_feed, preproc, name='spectro_hypo')
+                audio_encrypted = inverse_delta(config, to_feed, preproc, name=audio_pth[:-4] + '_spectro_best_'+str(e))
+                thresh = thresh_decay*min(thresh, d_max)
+                pesq_nb = pesq_score(orig.numpy(), audio_encrypted, fs, 'nb')
+                pesq_wb = pesq_score(orig.numpy(), audio_encrypted, fs, 'wb')
+                print('PESQ score: {} {}'.format(pesq_nb, pesq_wb))
+                logs.append((e, pesq_nb, pesq_wb))
+
+                # dump data
+                pkl_path = audio_pth[:-4] + '_spectro_data.pkl'
+                with open(pkl_path, 'wb') as f:
+                    pickle.dump((losses, logs, edit_dists), f)
+
+            # if e % 100 == 0:
+            #     print("Writing audio")
+            #     inverse_delta(config, to_feed, preproc, name='spectro_hypo')
+
+        loss.backward()
+        losses.append(loss.item())
+        optimizer.step()
+        # dont know why this worked
+        with torch.no_grad():
+            delta += delta.clamp_(min=-thresh, max=thresh) - delta
+
+        if e % lr_step == 0:
+            lr_scheduler.step()
+
 
 
 def stego_audio(config_full, add_noise, audio_pth='tests/timit.wav',
@@ -125,7 +177,7 @@ def stego_audio(config_full, add_noise, audio_pth='tests/timit.wav',
             cur_out = list(model.infer_batch(batch)[0][0])
             global start_time
             print(start_time)
-            print("Time taken for", check_every, "iterations:", time.time() - start_time)
+            print("Time taken for", e, "iterations:", time.time() - start_time)
             print("Delta: {}".format(torch.abs(orig - delta).sum()))
             d_max = delta.max().item()
             print("Iteration: {}, Loss: {}, cur_out: {}, d_max: {}, thresh: {}".format(e, loss, cur_out, d_max, thresh))
@@ -197,7 +249,8 @@ if __name__ == "__main__":
     target = load_targets(args.target)
     print(target)
     # stego_spectro(config)
-    stego_audio(config, add_noise=int(args.noise), audio_pth=args.audio_path, target_text=target)
+    # stego_audio(config, add_noise=int(args.noise), audio_pth=args.audio_path, target_text=target)
+    stego_spectro(config, audio_pth=args.audio_path, target_text=target)
     print("Time taken by script:", time.time() - start_time)
     # can get phase from audio by setting power=None in spectrogram but GriffinLim does not accept it as input
     # so no point, otherwise we find other functions/libraries which can invert spectrogram
