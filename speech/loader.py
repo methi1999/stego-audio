@@ -74,7 +74,7 @@ class Preprocessor:
         return inputs.T, targets
 
     def invert_norm(self, spec):
-        return spec * self.std + self.mean
+        return spec.T * self.std + self.mean
 
     @property
     def input_dim(self):
