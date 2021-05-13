@@ -1,15 +1,11 @@
+.gitignore
+
 notebooks/
 .idea/
 dataset/
 ctc_best/*
 !ctc_best/best_model
 !ctc_best/best_preproc
-
-# vim
-.*.swp
-
-# audio files
-*.wav
 
 # Mac DS_Store
 *.DS_Store

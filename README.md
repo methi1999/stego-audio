@@ -1,18 +1,14 @@
-# speech
+# Hear Me If You Can!
 
-Speech is an open-source package to build end-to-end models for automatic
-speech recognition. Sequence-to-sequence models with attention,
-Connectionist Temporal Classification and the RNN Sequence Transducer
-are currently supported.
+This repository contains the code for our project on audio steganography. Most of our work is based on
+[this](https://isca-speech.org/archive/Interspeech_2020/abstracts/1294.html) paper.
+This work was done as part of [CS753: Automatic Speech Recognition](https://www.cse.iitb.ac.in/~pjyothi/cs753/index.html) at IIT Bombay.
 
-The goal of this software is to facilitate research in end-to-end models for
-speech recognition. The models are implemented in PyTorch.
+A major chunk of the repo has been forked from [here](https://github.com/awni/speech).
 
-The software has only been tested in Python3.6. 
+Contributors: Samyak Shah, Rishabh Dahale and Mithilesh Vaidya
 
-**We will not be providing backward compatability for Python2.7.**
-
-## Install
+## Installation
 
 We recommend creating a virtual environment and installing the python
 requirements there.
@@ -23,57 +19,25 @@ source <path_to_your_env>/bin/activate
 pip install -r requirements.txt
 ```
 
-Then follow the installation instructions for a version of
-[PyTorch](http://pytorch.org/) which works for your machine.
+## Directory structure
 
-After all the python requirements are installed, from the top level directory,
-run:
+*ctc_best*: Trained ASR models
 
-```
-make
-```
+*examples*: a few examples which are mentioned in the presentation. Each recording has a folder which contains:
+1. name.wav: original clean recording e.g. walter.wav
+2. name_encoded_text.wav: perturbed recording for the encoded text
+3. name_encoded_text.pkl: pickle file containing loss and PESQ score as a function of the number of iterations
 
-The build process requires CMake as well as Make.
+*speech*: main codebase which contains the ASR model and preprocessing steps
 
-After that, source the `setup.sh` from the repo root.
+*final_presentation.pptx*: a brief presentation of our project
 
-```
-source setup.sh
-```
+*stego.py*: contains the actual stego algorithm
 
-Consider adding this to your `bashrc`.
+*train.py*: file for training the ASR model
 
-You can verify the install was successful by running the
-tests from the `tests` directory.
+## Running the code
 
-```
-cd tests
-pytest
-```
+*stego.py* contains the both algorithms for calculating the perturbation in time-domain and spectral-domain
 
-## Run 
-
-To train a model run
-```
-python train.py <path_to_config>
-```
-
-After the model is done training you can evaluate it with
-
-```
-python eval.py <path_to_model> <path_to_data_json>
-```
-
-To see the available options for each script use `-h`: 
-
-```
-python {train, eval}.py -h
-```
-
-## Examples
-
-For examples of model configurations and datasets, visit the examples
-directory. Each example dataset should have instructions and/or scripts for
-downloading and preparing the data. There should also be one or more model
-configurations available. The results for each configuration will documented in
-each examples corresponding `README.md`.
+It takes as input a path to the audio recording and a list of phones to encode.

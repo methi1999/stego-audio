@@ -1,11 +1,8 @@
 editdistance
 numpy
-py
-pycparser
 pytest
 PyYAML
 scipy
-six
 tensorboard-logger
 tqdm
 torch
