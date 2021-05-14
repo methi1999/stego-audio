@@ -25,23 +25,32 @@ def pesq_loss_edit_iter(pickle_path, title):
     # plt.grid(True)
     # plt.legend()
     # plt.show()
-    
+
+
 def pesq_loss_edit_iter_noise(pickle_path1, pickle_path2, title):
     loss, pesq, edit = pickle.load(open(pickle_path1, 'rb'))
     # pesq
     iters = [x[0] for x in pesq]
     wb, nb = [x[1] for x in pesq], [x[2] for x in pesq]
-    plt.plot(iters, wb, color='b', label='Without Noise', marker='x')
+    plt.plot(iters, wb, color='b', label='Proper text (Sr. No. 1)', marker='x')
     plt.title(title)
     plt.xlabel("Iterations")
     plt.ylabel("PESQ score")
     plt.grid(True)
 
+    # # edit
+    # iters, edit = [x[0] for x in pesq], [x[1] for x in pesq]
+    # plt.plot(iters, edit, color='b', label='Without Noise', marker='x')
+    # plt.title(title)
+    # plt.xlabel("Iterations")
+    # plt.ylabel("Edit")
+    # plt.grid(True)
+
     loss, pesq, edit = pickle.load(open(pickle_path2, 'rb'))
     # pesq
     iters = [x[0] for x in pesq]
     wb, nb = [x[1] for x in pesq], [x[2] for x in pesq]
-    plt.plot(iters, wb, color='r', label='With Noise', marker='x')
+    plt.plot(iters, wb, color='r', label='Random text (Sr. No. 2)', marker='x')
     plt.legend()
     plt.show()
 
@@ -64,4 +73,6 @@ def plot_noise():
 
 
 if __name__ == '__main__':
-    pesq_loss_edit_iter('../../Final Audio/destroyer_mithilesh/destroyer_code_red.pkl', '')
+    # pesq_loss_edit_iter('../../examples/TIMIT_test/test_nuclear.pkl', '')
+    pesq_loss_edit_iter_noise('../../examples/TIMIT_test/test_nuclear.pkl', '../../examples/TIMIT_test/test_rand.pkl',
+                              'TIMIT - random vs proper text')
